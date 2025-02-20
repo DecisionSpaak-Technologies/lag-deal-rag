@@ -4,6 +4,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
+from langsmith import traceable
+from langsmith import Client
 
 import os
 import dotenv
@@ -18,6 +20,11 @@ os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = dotenv.get_key('.env', 'LANGCHAIN_API_KEY')
 os.environ["OPENAI_API_KEY"] = dotenv.get_key('.env', 'OPENAI_API_KEY')
 
+os.environ["LANGSMITH_ENDPOINT"] = 'https://api.smith.langchain.com'
+os.environ["LANGSMITH_PROJECT"] = dotenv.get_key('.env', 'LANGSMITH_PROJECT')
+
+
+client = Client()
 
 print("Initializing chat model...")
 llm = init_chat_model("gpt-4o-mini", model_provider="openai")
@@ -30,7 +37,7 @@ vector_store = Chroma(embedding_function=embeddings)
 
 # Load and chunk contents of the pdf
 print("Loading PDF document...")
-loader = PyPDFLoader("./data/deal_book.pdf")
+loader = PyPDFLoader("./data/pdf_data.pdf")
 print('Document Loaded Successfully')
 
 # Load pages synchronously
@@ -83,6 +90,7 @@ class Question(BaseModel):
 class Answer(BaseModel):
     answer: str
 
+@traceable
 @app.post("/get_response", response_model=Answer)
 async def get_response(question_data: Question):
 
