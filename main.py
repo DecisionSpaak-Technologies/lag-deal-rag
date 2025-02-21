@@ -15,6 +15,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import START, StateGraph
 from typing_extensions import List, TypedDict
+from langchain.evaluation import RunEvalConfig, EvaluatorType
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = dotenv.get_key('.env', 'LANGCHAIN_API_KEY')
@@ -37,7 +38,7 @@ vector_store = Chroma(embedding_function=embeddings)
 
 # Load and chunk contents of the pdf
 print("Loading PDF document...")
-loader = PyPDFLoader("./data/pdf_data.pdf")
+loader = PyPDFLoader("./data/deal_book.pdf")
 print('Document Loaded Successfully')
 
 # Load pages synchronously
@@ -99,6 +100,43 @@ async def get_response(question_data: Question):
     
     # Extract and return the answer
     return {"answer": response["answer"]}
+
+
+# Evaluation....
+# example_inputs = [
+#     "what is the population of Lagos State",
+#     "Tell me about the current Power situation in LAgos",
+#     "What is the Purple Line Rail Project",
+#     "What are the free zone benefits",
+#     "What are the projects LAgos has for Tourism"
+# ]
+
+# dataset_name = "Evaluation 1"
+
+# dataset = client.create_dataset(
+#     dataset_name,
+#     description="Evaluation dataset 1 for the Lagos State Government deal book",)
+
+# for input_prompt in example_inputs:
+#     client.create_example(
+#         inputs={"question": input_prompt},
+#         outputs=None,
+#         dataset_id=dataset.id
+#     )
+
+#     # Evaluate dataset with LLM as a judge
+#     eval_config = RunEvalConfig(
+#         evaluators=[
+
+#             "criteria",
+#             RunEvalConfig.Criteria("consiseness"),
+#             RunEvalConfig.Criteria("relevance"),
+#             RunEvalConfig.Criteria("correctness"),
+#             RunEvalConfig.Criteria("helpfulness"),
+#             RunEvalConfig.Criteria("creativity"),
+#         ]
+#     )
+
 
 if __name__ == "__main__":
     print("Starting FastAPI server...")
