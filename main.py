@@ -6,6 +6,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langsmith import traceable
 from langsmith import Client
+from langchain.smith import RunEvalConfig, run_on_dataset
+
 
 import os
 import dotenv
@@ -15,7 +17,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import START, StateGraph
 from typing_extensions import List, TypedDict
-from langchain.evaluation import RunEvalConfig, EvaluatorType
+
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = dotenv.get_key('.env', 'LANGCHAIN_API_KEY')
@@ -103,39 +105,46 @@ async def get_response(question_data: Question):
 
 
 # Evaluation....
-# example_inputs = [
-#     "what is the population of Lagos State",
-#     "Tell me about the current Power situation in LAgos",
-#     "What is the Purple Line Rail Project",
-#     "What are the free zone benefits",
-#     "What are the projects LAgos has for Tourism"
-# ]
+example_inputs = [
+    "Tell me about the current Power situation in LAgos",
+    "What is the Purple Line Rail Project",
+    "What are the free zone benefits",
+    "What are the projects LAgos has for Tourism",
+    "What are the projects Lagos has for Agriculture",
+    "what is the population of Lagos State",
+    
+]
 
-# dataset_name = "Evaluation 1"
+dataset_name = "Evaluation zero"
 
-# dataset = client.create_dataset(
-#     dataset_name,
-#     description="Evaluation dataset 1 for the Lagos State Government deal book",)
+dataset = client.create_dataset(
+    dataset_name,
+    description="Evaluation dataset 1 for the Lagos State Government deal book",)
 
-# for input_prompt in example_inputs:
-#     client.create_example(
-#         inputs={"question": input_prompt},
-#         outputs=None,
-#         dataset_id=dataset.id
-#     )
+for input_prompt in example_inputs:
+    client.create_example(
+        inputs={"question": input_prompt},
+        outputs=None,
+        dataset_id=dataset.id
+    )
 
-#     # Evaluate dataset with LLM as a judge
-#     eval_config = RunEvalConfig(
-#         evaluators=[
+ # Evaluate dataset with LLM as a judge
+eval_config = RunEvalConfig(
+    evaluators=[
+        {"type": "criteria", "criteria": "conciseness"},
+        {"type": "criteria", "criteria": "relevance"},
+        {"type": "criteria", "criteria": "correctness"},
+        {"type": "criteria", "criteria": "helpfulness"},
+        {"type": "criteria", "criteria": "creativity"},
+    ]
+)
 
-#             "criteria",
-#             RunEvalConfig.Criteria("consiseness"),
-#             RunEvalConfig.Criteria("relevance"),
-#             RunEvalConfig.Criteria("correctness"),
-#             RunEvalConfig.Criteria("helpfulness"),
-#             RunEvalConfig.Criteria("creativity"),
-#         ]
-#     )
+run_on_dataset(
+    client=client,
+    dataset_name=dataset_name,
+    llm_or_chain_factory=llm,
+    evaluation=eval_config,
+)
 
 
 if __name__ == "__main__":
