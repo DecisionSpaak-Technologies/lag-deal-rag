@@ -1,32 +1,33 @@
+import os
+import dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing_extensions import TypedDict, List
+
+# Import LangChain and LangSmith components
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-from langsmith import traceable
-from langsmith import Client
-from langchain.smith import RunEvalConfig, run_on_dataset
-
-
-import os
-import dotenv
-
 from langchain import hub
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import START, StateGraph
-from typing_extensions import List, TypedDict
 
+from langsmith import traceable, Client
+from langchain.smith import RunEvalConfig, run_on_dataset
+# Import BaseCache and rebuild the RunEvalConfig model
+# from langchain.schema.cache import BaseCache
+# RunEvalConfig.model_rebuild(BaseCache=BaseCache)
 
+# Set up environment variables
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = dotenv.get_key('.env', 'LANGCHAIN_API_KEY')
 os.environ["OPENAI_API_KEY"] = dotenv.get_key('.env', 'OPENAI_API_KEY')
-
 os.environ["LANGSMITH_ENDPOINT"] = 'https://api.smith.langchain.com'
 os.environ["LANGSMITH_PROJECT"] = dotenv.get_key('.env', 'LANGSMITH_PROJECT')
 
-
+# Initialize LangSmith client, LLM, embeddings, and vector store
 client = Client()
 
 print("Initializing chat model...")
@@ -38,53 +39,48 @@ embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 print("Initializing vector store...")
 vector_store = Chroma(embedding_function=embeddings)
 
-# Load and chunk contents of the pdf
+# Load the PDF document and split it into chunks
 print("Loading PDF document...")
 loader = PyPDFLoader("./data/deal_book.pdf")
-print('Document Loaded Successfully')
-
-# Load pages synchronously
-print("Loading pages from PDF...")
 docs = loader.load()
-print('Page loaded successfully')
-
 print("Splitting text into chunks...")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 all_splits = text_splitter.split_documents(docs)
 
-# Index chunks
+# Index the chunks into the vector store
 print("Indexing chunks into vector store...")
 _ = vector_store.add_documents(documents=all_splits)
 
-# Define prompt for question-answering
+# Load the prompt for question-answering from the hub
 print("Pulling RAG prompt from hub...")
 prompt = hub.pull("rlm/rag-prompt")
 
-# Define state for application
+# Define the state type for our application
 class State(TypedDict):
     question: str
     context: List[Document]
     answer: str
 
-# Define application steps
-def retrieve(state: State):
+# Define pipeline steps: retrieval and generation
+def retrieve(state: State) -> dict:
     print("Retrieving relevant documents...")
     retrieved_docs = vector_store.similarity_search(state["question"])
     return {"context": retrieved_docs}
 
-def generate(state: State):
+def generate(state: State) -> dict:
     print("Generating answer...")
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
     messages = prompt.invoke({"question": state["question"], "context": docs_content})
     response = llm.invoke(messages)
     return {"answer": response.content}
 
-# Compile application and test
+# Build the state graph from the defined steps
 print("Building state graph...")
 graph_builder = StateGraph(State).add_sequence([retrieve, generate])
 graph_builder.add_edge(START, "retrieve")
 graph = graph_builder.compile()
 
+# Define the FastAPI app and routes
 app = FastAPI()
 
 class Question(BaseModel):
@@ -96,56 +92,14 @@ class Answer(BaseModel):
 @traceable
 @app.post("/get_response", response_model=Answer)
 async def get_response(question_data: Question):
-
-    # Call the graph.invoke function with the provided question
     response = graph.invoke({"question": question_data.question})
-    
-    # Extract and return the answer
     return {"answer": response["answer"]}
 
-
-# Evaluation....
-example_inputs = [
-    "Tell me about the current Power situation in LAgos",
-    "What is the Purple Line Rail Project",
-    "What are the free zone benefits",
-    "What are the projects LAgos has for Tourism",
-    "What are the projects Lagos has for Agriculture",
-    "what is the population of Lagos State",
-    
-]
-
-dataset_name = "Evaluation zero"
-
-dataset = client.create_dataset(
-    dataset_name,
-    description="Evaluation dataset 1 for the Lagos State Government deal book",)
-
-for input_prompt in example_inputs:
-    client.create_example(
-        inputs={"question": input_prompt},
-        outputs=None,
-        dataset_id=dataset.id
-    )
-
- # Evaluate dataset with LLM as a judge
-eval_config = RunEvalConfig(
-    evaluators=[
-        {"type": "criteria", "criteria": "conciseness"},
-        {"type": "criteria", "criteria": "relevance"},
-        {"type": "criteria", "criteria": "correctness"},
-        {"type": "criteria", "criteria": "helpfulness"},
-        {"type": "criteria", "criteria": "creativity"},
-    ]
-)
-
-run_on_dataset(
-    client=client,
-    dataset_name=dataset_name,
-    llm_or_chain_factory=llm,
-    evaluation=eval_config,
-)
-
+# ===================== Evaluation Section =====================
+# Define a chain factory that runs the full pipeline using the state graph.
+# def chain_factory(example: dict) -> dict:
+#     # Each example is expected to have an "inputs" dict with a "question" key.
+#     return graph.invoke(example["inputs"])
 
 if __name__ == "__main__":
     print("Starting FastAPI server...")
