@@ -28,39 +28,39 @@ example_inputs = [
 
 # Create an evaluation dataset on LangSmith
 dataset_name = "LAG_DEAL_RAG_EVAL_1"
-dataset = client.create_dataset(
-    dataset_name,
-    description="Evaluation dataset for the Lagos State Government deal book",
-)
+# dataset = client.create_dataset(
+#     dataset_name,
+#     description="Evaluation dataset for the Lagos State Government deal book",
+# )
 
 # ===================== Fixed Evaluation Section =====================
 # 1. Create evaluators using load_evaluator (not dictionaries)
-criteria_evaluators = [
-    load_evaluator("criteria", criteria="conciseness"),
-    load_evaluator("criteria", criteria="relevance"),
-    load_evaluator("criteria", criteria="correctness"),
-    load_evaluator("criteria", criteria="helpfulness"),
-]
+# criteria_evaluators = [
+#     load_evaluator("criteria", criteria="conciseness"),
+#     load_evaluator("criteria", criteria="relevance"),
+#     load_evaluator("criteria", criteria="correctness"),
+#     load_evaluator("criteria", criteria="helpfulness"),
+# ]
 
 # 2. Define a proper chain factory
 def chain_factory(example: dict):
     return graph.invoke(example["inputs"])
 
 # 3. Configure RunEvalConfig correctly
-eval_config = RunEvalConfig(
-    evaluators=criteria_evaluators,
-    input_key="question",  # Match your dataset's input key
-    prediction_key="answer",  # Match your chain's output key
-)
+# eval_config = RunEvalConfig(
+#     evaluators=criteria_evaluators,
+#     input_key="question",  # Match your dataset's input key
+#     prediction_key="answer",  # Match your chain's output key
+# )
 
 # 4. Run evaluation with the chain factory
 print("Running evaluation on dataset...")
-run_on_dataset(
-    client=client,
-    dataset_name=dataset_name,
-    llm_or_chain_factory=chain_factory,  # Use chain factory, not raw LLM
-    evaluation=eval_config,
-)
+# run_on_dataset(
+#     client=client,
+#     dataset_name=dataset_name,
+#     llm_or_chain_factory=chain_factory,  # Use chain factory, not raw LLM
+#     evaluation=eval_config,
+# )
 
 # ================================================================
 

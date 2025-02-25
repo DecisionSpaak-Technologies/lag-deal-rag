@@ -1,5 +1,7 @@
 import os
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
+
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -27,7 +29,7 @@ vector_store = Chroma(embedding_function=embeddings)
 
 # Load and split the PDF document
 print("Loading PDF document...")
-loader = PyPDFLoader("./data/deal_book.pdf")
+loader = PyMuPDFLoader("./data/deal_book.pdf")
 docs = loader.load()
 print("Splitting text into chunks...")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
