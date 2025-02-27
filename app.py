@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from models import Question, Answer
-from services import graph
+from services import graph, memory_store
 from langsmith import traceable, Client
 from langchain.smith import RunEvalConfig, run_on_dataset
 from langchain.chat_models import init_chat_model
 from langchain.evaluation import load_evaluator
+from datetime import datetime
 
 app = FastAPI()
 client = Client()
@@ -13,8 +14,16 @@ llm = init_chat_model("gpt-4o-mini", model_provider="openai")
 @traceable
 @app.post("/get_response", response_model=Answer)
 async def get_response(question_data: Question):
-    response = graph.invoke({"question": question_data.question})
-    return {"answer": response["answer"]}
+    # Initialize state with all required fields
+    initial_state = {
+        "question": question_data.question,
+        "session_id": question_data.session_id,
+        "context": [],
+        "answer": None
+    }
+    
+    response = graph.invoke(initial_state)
+    return response
 
 # Define evaluation examples (expand as needed)
 example_inputs = [

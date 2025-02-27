@@ -12,6 +12,10 @@ from langgraph.graph import START, StateGraph
 from langsmith import Client
 from typing_extensions import TypedDict, List
 
+from langchain.memory import VectorStoreRetrieverMemory
+from langchain.schema import Document
+from datetime import datetime  
+
 # Initialize LangSmith client
 client = Client()
 
@@ -49,21 +53,88 @@ class State(TypedDict):
     context: List[Document]
     answer: str
 
-# Define pipeline steps: retrieval and generation
+# ===================== Memory Setup =====================
+# Separate vector store for memories
+memory_store = Chroma(
+    embedding_function=OpenAIEmbeddings(model="text-embedding-3-small"),
+    collection_name="conversation_memories"
+)
+
+# Memory retriever (last 3 relevant interactions)
+memory_retriever = memory_store.as_retriever(
+    search_kwargs={
+        "k": 3,
+        "filter": {
+            "$and": [
+                {"session_id": {"$eq": "default"}},  # Use $eq operator
+                {"type": {"$eq": "memory"}}
+            ]
+        }
+    }
+)
+
+# Initialize memory system
+memory = VectorStoreRetrieverMemory(
+    retriever=memory_retriever,
+    memory_key="chat_history",
+    input_key="question",
+    session_key="session_id"
+)
+
+# ===================== Modified Pipeline =====================
+# ... (previous imports)
+
 def retrieve(state: State) -> dict:
-    print("Retrieving relevant documents...")
-    retrieved_docs = vector_store.similarity_search(state["question"])
-    return {"context": retrieved_docs}
+    session_id = state.get("session_id", "default")
+    main_docs = vector_store.similarity_search(state["question"])
+    
+    # Update filter syntax
+    memory_docs = memory_store.similarity_search(
+        state["question"],
+        k=3,
+        filter={
+            "$and": [
+                {"session_id": {"$eq": session_id}},
+                {"type": {"$eq": "memory"}}
+            ]
+        }
+    )
+    
+    return {
+        "context": main_docs + memory_docs,
+        "session_id": session_id
+    }
 
 def generate(state: State) -> dict:
-    print("Generating answer...")
+    # Ensure session_id exists
+    session_id = state.get("session_id", "default")
+    
+    # Generate answer
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
-    messages = prompt.invoke({"question": state["question"], "context": docs_content})
-    response = llm.invoke(messages)
-    return {"answer": response.content}
+    response = llm.invoke(prompt.format(
+        question=state["question"],
+        context=docs_content
+    ))
+    
+    # Save to memory
+    memory_store.add_documents([Document(
+        page_content=f"Q: {state['question']}\nA: {response.content}",
+        metadata={
+            "session_id": session_id,
+            "type": "memory",
+            "timestamp": datetime.now().isoformat()
+        }
+    )])
+    
+    return {
+        "answer": response.content,
+        "session_id": session_id  # Pass through session_id
+    }
 
-# Build the state graph
-print("Building state graph...")
-graph_builder = StateGraph(State).add_sequence([retrieve, generate])
+# Build the graph with explicit state handling
+graph_builder = StateGraph(State)
+graph_builder.add_node("retrieve", retrieve)
+graph_builder.add_node("generate", generate)
 graph_builder.add_edge(START, "retrieve")
+graph_builder.add_edge("retrieve", "generate")
 graph = graph_builder.compile()

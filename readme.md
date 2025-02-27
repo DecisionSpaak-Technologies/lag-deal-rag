@@ -3,9 +3,10 @@
 ```
 ├── data/                      # Data files (e.g., PDFs)
 │   └── deal_book.pdf
-├── main.py                    # FastAPI app and routes
+├── app.py                    # FastAPI app and routes
 ├── .gitignore                 # gitignore file
 ├── models.py                  # Pydantic models and state definitions
+├── origin_main.py             # Original and combined py file
 ├── main_with_rc.py            # origin_main but with relevant context as output
 ├── config.py                  # Environment variables and configuration
 ├── requirements.txt           # Project dependencies
@@ -14,6 +15,3 @@
 └── README.md                  # Project documentation
 
 ```
-
-
-
