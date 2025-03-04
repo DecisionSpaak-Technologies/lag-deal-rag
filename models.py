@@ -11,9 +11,11 @@ class Answer(BaseModel):
     answer: str
     session_id: str = "default"
 
-# State with Memory Context
+# State with Memory Context# UPDATE STATE CLASS DEFINITION
 class State(TypedDict):
     question: str
-    session_id: str  # Required field
     context: List[Document]
-    answer: Optional[str]  # Allow None for initial state
+    image_context: List[Document]
+    answer: str
+    session_id: str
+    is_visual: bool
