@@ -1,7 +1,7 @@
+from langchain_community.document_loaders import UnstructuredAPIFileLoader  # Correct API loader
 import os
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.document_loaders import PyMuPDFLoader
-
+import dotenv
+from langchain_community.document_loaders import PyPDFLoader, PyMuPDFLoader
 from langchain.chat_models import init_chat_model
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -11,20 +11,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import START, StateGraph
 from langsmith import Client
 from typing_extensions import TypedDict, List
-
 from langchain.memory import VectorStoreRetrieverMemory
-from langchain.schema import Document
-from datetime import datetime  
-
-from langchain.prompts import PromptTemplate
-from langchain.prompts import FewShotPromptTemplate
-
+from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain_core.messages import HumanMessage
 import base64
-
 from PIL import Image
 import io
-import fitz  # PyMuPDF
+import fitz
+from datetime import datetime 
 
 # Initialize LangSmith client
 client = Client()
@@ -43,8 +37,27 @@ vector_store = Chroma(embedding_function=embeddings)
 
 # Load and split the PDF document
 print("Loading PDF document...")
-loader = PyMuPDFLoader("./data/deal_book.pdf")
+# loader = PyMuPDFLoader("./data/deal_book.pdf")
+# docs = loader.load()
+
+from langchain_unstructured import UnstructuredLoader
+
+os.environ["UNSTRUCTURED_API_KEY"] = dotenv.get_key('.env', 'UNSTRUCTURED_API_KEY')
+
+loader = UnstructuredAPIFileLoader(
+    file_path="./data/deal_book.pdf",
+    api_key=os.getenv("UNSTRUCTURED_API_KEY"),  # Direct access
+    mode="single",  # Simplified mode for documents
+    strategy="hi_res",  # Force OCR
+    ocr_languages=["eng"],  # List format for languages
+    skip_infer_table_types=["pdf"],  # Valid type
+    extract_image_block_types=["Image", "Table"],
+    extract_image_block_to_payload=True
+)
+
 docs = loader.load()
+
+
 print("Splitting text into chunks...")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 all_splits = text_splitter.split_documents(docs)
