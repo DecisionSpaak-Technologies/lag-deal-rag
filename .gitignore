@@ -3,4 +3,6 @@
 pdf_data.pdf
 deal_book.pdf
 images
-
+image_store
+vector_stores
+cache
